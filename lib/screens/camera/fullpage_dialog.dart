@@ -163,7 +163,6 @@ class _FullPageDialogState extends State<FullPageDialog> {
       builder: (context) {
         return CameraSettingsPanel(
           currentResolution: selectedResolution,
-          currentAspectRatio: selectedAspectRatio,
           onResolutionChanged: (val) async {
             setState(() {
               selectedResolution = val;
@@ -173,12 +172,6 @@ class _FullPageDialogState extends State<FullPageDialog> {
             await _initializeCamera();
 
             if (mounted) Navigator.pop(context);
-          },
-          onAspectRatioChanged: (val) {
-            setState(() {
-              selectedAspectRatio = val;
-            });
-            // ปรับ UI หรือ logic อื่น ๆ ถ้าจำเป็น
           },
         );
       },
