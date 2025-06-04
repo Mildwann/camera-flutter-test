@@ -32,15 +32,10 @@ class _FullPageDialogState extends State<FullPageDialog>   with WidgetsBindingOb
      WidgetsBinding.instance.addObserver(this);
     _checkCameraPermissionAndInit();
   }
-  @override
-void dispose() {
-  WidgetsBinding.instance.removeObserver(this);
-  _controller?.dispose();
-  super.dispose();
-}
-
+  
    @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       // เมื่อแอพถูกสลับไป background หรือ inactive ให้ปิด dialog
       if (mounted) {

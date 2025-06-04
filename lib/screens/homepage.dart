@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:testcamera/screens/camera/fullpage_dialog.dart';
+import 'package:testcamera/screens/permissionRequestDialog.dart';
 
 class MyHomePage extends StatefulWidget  {
   final List<CameraDescription> cameras;
@@ -17,46 +18,54 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _lastCapturedImagePath;
   double? _imageAspectRatio;
 
-  void _showFullPageDialog(BuildContext context) async {
-      final status = await Permission.camera.status;
-  if (!status.isGranted) {
-    final result = await Permission.camera.request();
-    if (!result.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่ได้รับสิทธิ์เข้าถึงกล้อง')),
-      );
-      return; // ไม่อนุญาตก็ไม่เปิดกล้อง
-    }
-  }
-    final imagePath = await showGeneralDialog<String?>(
-      // ignore: use_build_context_synchronously
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'FullpageDialog',
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return FullPageDialog(cameras: widget.cameras);
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(0, 1),
-            end: Offset.zero,
-          ).animate(animation),
-          child: child,
-        );
-      },
-    );
+ void _showFullPageDialog(BuildContext context) async {
+  // แสดง permission dialog full screen
+  final permissionGranted = await Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => const PermissionRequestDialog(),
+    ),
+  );
 
-    if (imagePath != null) {
-      final bytes = await File(imagePath).readAsBytes();
-      final decodedImage = await decodeImageFromList(bytes);
-      setState(() {
-        _lastCapturedImagePath = imagePath;
-        _imageAspectRatio = decodedImage.width / decodedImage.height;
-      });
-    }
+  if (permissionGranted != true) {
+    // ไม่อนุญาตก็แจ้งเตือน
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ไม่ได้รับสิทธิ์เข้าถึงกล้อง')),
+    );
+    return;
   }
+
+  // ถ้าอนุญาตแล้วค่อยเปิด FullPageDialog
+  final imagePath = await showGeneralDialog<String?>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'FullpageDialog',
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, animation, secondaryAnimation) {
+      return FullPageDialog(cameras: widget.cameras);
+    },
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
+      );
+    },
+  );
+
+  if (imagePath != null) {
+    final bytes = await File(imagePath).readAsBytes();
+    final decodedImage = await decodeImageFromList(bytes);
+    setState(() {
+      _lastCapturedImagePath = imagePath;
+      _imageAspectRatio = decodedImage.width / decodedImage.height;
+    });
+  } else {
+    print('ผู้ใช้ปิดกล้องโดยไม่ได้ถ่ายภาพ');
+  }
+}
 
   void _deleteImage() {
     setState(() {
