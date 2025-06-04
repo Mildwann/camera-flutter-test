@@ -16,7 +16,7 @@ class FullPageDialog extends StatefulWidget {
   State<FullPageDialog> createState() => _FullPageDialogState();
 }
 
-class _FullPageDialogState extends State<FullPageDialog> {
+class _FullPageDialogState extends State<FullPageDialog>   with WidgetsBindingObserver{
   CameraController? _controller;
   bool _isCameraInitialized = false;
   int _selectedCameraIndex = 0;
@@ -28,7 +28,41 @@ class _FullPageDialogState extends State<FullPageDialog> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+    // _initializeCamera();
+     WidgetsBinding.instance.addObserver(this);
+    _checkCameraPermissionAndInit();
+  }
+  @override
+void dispose() {
+  WidgetsBinding.instance.removeObserver(this);
+  _controller?.dispose();
+  super.dispose();
+}
+
+   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      // เมื่อแอพถูกสลับไป background หรือ inactive ให้ปิด dialog
+      if (mounted) {
+        Navigator.of(context).pop(_capturedImage?.path);
+      }
+    }
+  }
+
+  Future<void> _checkCameraPermissionAndInit() async {
+    final status = await Permission.camera.status;
+    if (!status.isGranted) {
+      final result = await Permission.camera.request();
+      if (!result.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่ได้รับสิทธิ์เข้าถึงกล้อง')),
+        );
+        Navigator.of(context).pop();
+        return;
+      }
+    }
+    await _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {

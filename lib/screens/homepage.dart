@@ -2,9 +2,10 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:testcamera/screens/camera/fullpage_dialog.dart';
 
-class MyHomePage extends StatefulWidget {
+class MyHomePage extends StatefulWidget  {
   final List<CameraDescription> cameras;
   const MyHomePage({super.key, required this.cameras});
 
@@ -14,9 +15,21 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String? _lastCapturedImagePath;
+  double? _imageAspectRatio;
 
   void _showFullPageDialog(BuildContext context) async {
+      final status = await Permission.camera.status;
+  if (!status.isGranted) {
+    final result = await Permission.camera.request();
+    if (!result.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่ได้รับสิทธิ์เข้าถึงกล้อง')),
+      );
+      return; // ไม่อนุญาตก็ไม่เปิดกล้อง
+    }
+  }
     final imagePath = await showGeneralDialog<String?>(
+      // ignore: use_build_context_synchronously
       context: context,
       barrierDismissible: true,
       barrierLabel: 'FullpageDialog',
@@ -36,8 +49,11 @@ class _MyHomePageState extends State<MyHomePage> {
     );
 
     if (imagePath != null) {
+      final bytes = await File(imagePath).readAsBytes();
+      final decodedImage = await decodeImageFromList(bytes);
       setState(() {
         _lastCapturedImagePath = imagePath;
+        _imageAspectRatio = decodedImage.width / decodedImage.height;
       });
     }
   }
@@ -76,49 +92,52 @@ class _MyHomePageState extends State<MyHomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Elevated Gradient Button
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6F42C1), Color(0xFF9B59B6)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              // Open Camera Button (Improved)
+              GestureDetector(
+                onTap: () => _showFullPageDialog(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20,
+                    horizontal: 60,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.deepPurple.withOpacity(0.6),
-                      blurRadius: 14,
-                      offset: const Offset(0, 8),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00B4DB), Color(0xFF0083B0)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ),
-                child: ElevatedButton(
-                  onPressed: () => _showFullPageDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 60),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.blueAccent.withOpacity(0.4),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  child: const Text(
-                    'Open Camera',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      letterSpacing: 1.2,
-                      fontFamily: 'Segoe UI',
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.camera_alt, color: Colors.white),
+                      SizedBox(width: 12),
+                      Text(
+                        'Open Camera',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.1,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
               const SizedBox(height: 52),
+
+              // Animated Image Preview
               AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
+                duration: const Duration(milliseconds: 500),
                 switchInCurve: Curves.easeOutBack,
                 switchOutCurve: Curves.easeInBack,
                 child: _lastCapturedImagePath != null
@@ -127,38 +146,67 @@ class _MyHomePageState extends State<MyHomePage> {
                         alignment: Alignment.topRight,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(30),
                             child: Container(
+                              width: screenWidth * 0.8,
+                              height: screenHeight * 0.45,
                               decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.85),
-                                    blurRadius: 24,
-                                    spreadRadius: 2,
-                                    offset: const Offset(0, 10),
+                                borderRadius: BorderRadius.circular(30),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withOpacity(0.1),
+                                    Colors.white.withOpacity(0.05),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: _imageAspectRatio != null
+                                        ? AspectRatio(
+                                            aspectRatio: _imageAspectRatio!,
+                                            child: Image.file(
+                                              File(_lastCapturedImagePath!),
+                                              fit: BoxFit
+                                                  .contain, // ไม่ครอป ไม่บีบภาพ
+                                            ),
+                                          )
+                                        : Image.file(
+                                            File(_lastCapturedImagePath!),
+                                            fit: BoxFit.contain,
+                                          ),
                                   ),
                                 ],
                               ),
-                              child: Image.file(
-                                File(_lastCapturedImagePath!),
-                                width: screenWidth * 0.75,
-                                height: screenHeight * 0.45,
-                                fit: BoxFit.cover,
-                              ),
                             ),
                           ),
-                          // Delete Button with subtle glow
+                          // Delete Button
                           Positioned(
-                            top: 16,
-                            right: 16,
-                            child: Material(
-                              color: Colors.black54,
-                              shape: const CircleBorder(),
-                              elevation: 10,
-                              child: IconButton(
-                                icon: const Icon(Icons.close_rounded, color: Colors.redAccent, size: 28),
-                                onPressed: _deleteImage,
-                                tooltip: 'Remove Photo',
+                            top: 12,
+                            right: 12,
+                            child: ClipOval(
+                              child: Material(
+                                color: Colors.black38,
+                                child: InkWell(
+                                  splashColor: Colors.redAccent.withOpacity(
+                                    0.4,
+                                  ),
+                                  onTap: _deleteImage,
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(
+                                      Icons.close,
+                                      size: 24,
+                                      color: Colors.redAccent,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -168,21 +216,20 @@ class _MyHomePageState extends State<MyHomePage> {
                         key: const ValueKey('no_image'),
                         padding: const EdgeInsets.symmetric(vertical: 48),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.photo_camera_outlined,
-                              size: 80,
-                              color: Colors.white38.withOpacity(0.6),
+                              Icons.camera_alt_outlined,
+                              size: 90,
+                              color: Colors.white24,
                             ),
-                            const SizedBox(height: 24),
-                            Text(
+                            const SizedBox(height: 20),
+                            const Text(
                               'No photo taken yet',
                               style: TextStyle(
-                                color: Colors.white54.withOpacity(0.7),
+                                color: Colors.white38,
                                 fontSize: 18,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 0.8,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: 0.7,
                               ),
                             ),
                           ],
